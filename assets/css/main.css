@@ -4713,3 +4713,17 @@ body.contact {
     background: url("images/plance.jpg") no-repeat center center fixed;
     background-size: cover;
 }
+
+/* Center and size the portrait image */
+.portrait {
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.portrait img {
+    display: inline-block;
+    max-width: 250px;   /* or any size you want */
+    width: 100%;
+    height: auto;
+    border-radius: 10px; /* optional */
+}
