@@ -4712,11 +4712,12 @@ body.research #wrapper > .bg {
         url("../../images/aoss.jpg");
 }
 
-/* Contact → plance.jpg */
+/* Contact → plane.jpg */
 body.contact #wrapper > .bg {
     background-image:
         url("../../images/overlay.png"),
         linear-gradient(0deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.1)),
-        url("../../images/plance.jpg");
+        url("../../images/plane.jpg");
 }
+
 
