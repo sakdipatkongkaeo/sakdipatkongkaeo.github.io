@@ -1,0 +1,315 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Orbit This! - Sakdipat “Jaf” Kongkaeo</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+		<style>
+			/* Custom styling for the game container and HUD */
+			#game-container {
+				position: relative;
+				width: 100%;
+				max-width: 800px;
+				margin: 0 auto;
+				background: #1e1e24;
+				border-radius: 8px;
+				overflow: hidden;
+				box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+			}
+			canvas {
+				display: block;
+				background: #0b0b10;
+				width: 100%;
+				height: auto;
+				cursor: crosshair;
+			}
+			.game-hud {
+				padding: 15px;
+				background: #15151a;
+				color: #ffffff;
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				flex-wrap: wrap;
+				font-size: 0.9em;
+				border-top: 1px solid #282830;
+			}
+			.game-hud div {
+				margin: 5px 10px;
+			}
+			.controls-hint {
+				background: #22222b;
+				padding: 15px;
+				border-radius: 6px;
+				margin-top: 20px;
+				font-size: 0.9em;
+			}
+		</style>
+	</head>
+	<body class="is-preload">
+
+		<div id="wrapper">
+
+			<!-- Header -->
+			<header id="header">
+				<a href="index.html" class="logo">Sakdipat “Jaf” Kongkaeo</a>
+			</header>
+
+			<!-- Nav -->
+			<nav id="nav">
+				<ul class="links">
+					<li><a href="index.html">Home</a></li>
+					<li><a href="research.html">Research</a></li>
+					<li><a href="publications.html">Publications</a></li>
+					<li><a href="personal.html">Personal Interests</a></li>
+					<li><a href="cv.html">CV</a></li>
+					<li class="active"><a href="game.html">Orbit Game</a></li>
+					<li><a href="contact.html">Contact</a></li>
+				</ul>
+				<ul class="icons">
+					<li><a href="https://github.com/sakdipatkongkaeo" class="icon brands fa-github"><span class="label">GitHub</span></a></li>
+					<li><a href="https://www.instagram.com/jafsolute/" class="icon brands fa-instagram"><span class="label">Instagram</span></a></li>
+				</ul>
+			</nav>
+
+			<!-- Main -->
+			<div id="main">
+				<section class="post">
+					<header class="major">
+						<h1>Orbit This!</h1>
+						<p>A lightweight 2D Newtonian orbital mechanics sandbox. Adjust your velocity vectors, use predicted trajectories, and maintain a stable orbit!</p>
+					</header>
+
+					<!-- Game Box -->
+					<div id="game-container">
+						<canvas id="orbitCanvas" width="800" height="600"></canvas>
+						<div class="game-hud">
+							<div><strong>Altitude:</strong> <span id="hud-alt">0</span> km</div>
+							<div><strong>Speed:</strong> <span id="hud-speed">0</span> km/s</div>
+							<div><strong>Zoom:</strong> <span id="hud-zoom">1.0</span>x (Scroll to Zoom)</div>
+						</div>
+					</div>
+
+					<div class="controls-hint">
+						<h3>Flight Controls:</h3>
+						<ul>
+							<li><strong>W / S</strong> or <strong>Up / Down Arrow</strong>: Prograde / Retrograde Thrust (Tangential velocity)</li>
+							<li><strong>A / D</strong> or <strong>Left / Right Arrow</strong>: Radial Thrust (Inward / Outward)</li>
+							<li><strong>R Key</strong>: Reset Ship to initial position</li>
+							<li><strong>Mouse Scroll</strong>: Zoom In / Out</li>
+						</ul>
+					</div>
+				</section>
+			</div>
+
+			<!-- Footer -->
+			<footer id="footer">
+				<section>
+					<h2>Contact</h2>
+					<ul class="icons alt">
+						<li><a href="mailto:kongkaeo@wisc.edu" class="icon solid alt fa-envelope"><span class="label">Email</span></a></li>
+						<li><a href="https://github.com/sakdipatkongkaeo" class="icon brands alt fa-github"><span class="label">GitHub</span></a></li>
+					</ul>
+				</section>
+			</footer>
+
+			<div id="copyright">
+				<ul><li>&copy; 2026 Sakdipat “Jaf” Kongkaeo</li><li>Design: HTML5 UP (Massively)</li></ul>
+			</div>
+
+		</div>
+
+		<!-- Scripts -->
+		<script src="assets/js/jquery.min.js"></script>
+		<script src="assets/js/jquery.scrollex.min.js"></script>
+		<script src="assets/js/jquery.scrolly.min.js"></script>
+		<script src="assets/js/browser.min.js"></script>
+		<script src="assets/js/breakpoints.min.js"></script>
+		<script src="assets/js/util.js"></script>
+		<script src="assets/js/main.js"></script>
+
+		<!-- Orbital Game Engine Script -->
+		<script>
+			const canvas = document.getElementById('orbitCanvas');
+			const ctx = canvas.getContext('2d');
+
+			// Physics & Game State
+			const G = 2000; // Gravitational constant scaled for game feel
+			const planet = { x: 0, y: 0, radius: 30, mass: 10000 };
+			
+			let ship = {
+				x: 0,
+				y: -180,
+				vx: 3.3,
+				vy: 0,
+				radius: 6,
+				fuel: 100
+			};
+
+			let camera = {
+				zoom: 1.0
+			};
+
+			let keys = {};
+
+			// Input Listeners
+			window.addEventListener('keydown', e => { keys[e.code] = true; });
+			window.addEventListener('keyup', e => { keys[e.code] = false; });
+			
+			canvas.addEventListener('wheel', e => {
+				e.preventDefault();
+				if (e.deltaY < 0) {
+					camera.zoom = Math.min(camera.zoom * 1.1, 3.0);
+				} else {
+					camera.zoom = Math.max(camera.zoom / 1.1, 0.4);
+				}
+			});
+
+			function resetShip() {
+				ship.x = 0;
+				ship.y = -180;
+				ship.vx = 3.3;
+				ship.vy = 0;
+			}
+
+			function updatePhysics() {
+				// Vector from planet to ship
+				let rx = ship.x - planet.x;
+				let ry = ship.y - planet.y;
+				let r2 = rx*rx + ry*ry;
+				let r = Math.sqrt(r2);
+
+				if (r < planet.radius) {
+					// Crash!
+					resetShip();
+					return;
+				}
+
+				// Gravity acceleration: a = -G * M / r^3 * r_vector
+				let accelFactor = -G * planet.mass / (r2 * r);
+				let ax = accelFactor * rx;
+				let ay = accelFactor * ry;
+
+				// Unit vectors for ship orientation (tangential and radial)
+				let ux = rx / r;
+				let uy = ry / r;
+				// Tangential vector (perpendicular to radial)
+				let tx = -uy;
+				let ty = ux;
+
+				// Handle Thrust Input
+				let thrustPower = 0.08;
+				if (keys['KeyW'] || keys['ArrowUp']) {
+					ship.vx += tx * thrustPower;
+					ship.vy += ty * thrustPower;
+				}
+				if (keys['KeyS'] || keys['ArrowDown']) {
+					ship.vx -= tx * thrustPower;
+					ship.vy -= ty * thrustPower;
+				}
+				if (keys['KeyA'] || keys['ArrowLeft']) {
+					ship.vx -= ux * thrustPower;
+					ship.vy -= uy * thrustPower;
+				}
+				if (keys['KeyD'] || keys['ArrowRight']) {
+					ship.vx += ux * thrustPower;
+					ship.vy += uy * thrustPower;
+				}
+				if (keys['KeyR']) {
+					resetShip();
+				}
+
+				// Apply acceleration to velocity
+				ship.vx += ax;
+				ship.vy += ay;
+
+				// Apply velocity to position
+				ship.x += ship.vx;
+				ship.y += ship.vy;
+
+				// Update HUD values
+				document.getElementById('hud-alt').innerText = Math.round(r - planet.radius);
+				document.getElementById('hud-speed').innerText = Math.sqrt(ship.vx*ship.vx + ship.vy*ship.vy).toFixed(2);
+				document.getElementById('hud-zoom').innerText = camera.zoom.toFixed(1);
+			}
+
+			function predictTrajectory() {
+				// Simulate future steps using a clone of ship state
+				let simX = ship.x;
+				let simY = ship.y;
+				let simVx = ship.vx;
+				let simVy = ship.vy;
+				let path = [];
+
+				for (let i = 0; i < 120; i++) {
+					let rx = simX - planet.x;
+					let ry = simY - planet.y;
+					let r2 = rx*rx + ry*ry;
+					let r = Math.sqrt(r2);
+					if (r < planet.radius) break;
+
+					let accelFactor = -G * planet.mass / (r2 * r);
+					simVx += accelFactor * rx;
+					simVy += accelFactor * ry;
+					simX += simVx;
+					simY += simVy;
+					path.push({x: simX, y: simY});
+				}
+				return path;
+			}
+
+			function draw() {
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+				ctx.save();
+				// Translate origin to center of canvas and apply camera zoom
+				ctx.translate(canvas.width / 2, canvas.height / 2);
+				ctx.scale(camera.zoom, camera.zoom);
+
+				// Draw Predicted Trajectory Line
+				let trajectory = predictTrajectory();
+				ctx.beginPath();
+				ctx.strokeStyle = 'rgba(0, 210, 255, 0.4)';
+				ctx.lineWidth = 2 / camera.zoom;
+				ctx.setLineDash([4, 4]);
+				for (let i = 0; i < trajectory.length; i++) {
+					if (i === 0) ctx.moveTo(trajectory[i].x, trajectory[i].y);
+					else ctx.lineTo(trajectory[i].x, trajectory[i].y);
+				}
+				ctx.stroke();
+				ctx.setLineDash([]); // Reset line dash
+
+				// Draw Central Body (Planet)
+				ctx.beginPath();
+				ctx.arc(planet.x, planet.y, planet.radius, 0, Math.PI * 2);
+				ctx.fillStyle = '#4a90e2';
+				ctx.fill();
+				ctx.lineWidth = 2;
+				ctx.strokeStyle = '#ffffff';
+				ctx.stroke();
+
+				// Draw Ship
+				ctx.beginPath();
+				ctx.arc(ship.x, ship.y, ship.radius, 0, Math.PI * 2);
+				ctx.fillStyle = '#ff5e62';
+				ctx.fill();
+				ctx.strokeStyle = '#ffffff';
+				ctx.lineWidth = 1.5;
+				ctx.stroke();
+
+				ctx.restore();
+			}
+
+			function loop() {
+				updatePhysics();
+				draw();
+				requestAnimationFrame(loop);
+			}
+
+			// Start game loop
+			loop();
+		</script>
+	</body>
+</html>
