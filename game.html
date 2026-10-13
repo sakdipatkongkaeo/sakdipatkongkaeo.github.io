@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html>
     <head>
-        <title>Collapsed Game - Sakdipat “Jaf” Kongkaeo</title>
+        <title>Collapsed - Sakdipat “Jaf” Kongkaeo</title>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
         <link rel="stylesheet" href="assets/css/main.css" />
@@ -36,6 +36,35 @@
                 font-size: 1.1em;
                 transition: background 0.4s ease, color 0.4s ease;
             }
+            /* On-screen Mobile Touch Controls */
+            .mobile-controls {
+                display: none;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 8px;
+                padding: 12px;
+                background: #22222b;
+            }
+            .touch-btn {
+                background: #f8bbd0;
+                color: #3e101e;
+                border: none;
+                padding: 16px 0;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 1em;
+                text-align: center;
+                user-select: none;
+                -webkit-user-select: none;
+                touch-action: manipulation;
+            }
+            .touch-btn:active {
+                background: #e1bee7;
+            }
+            @media (max-width: 840px) {
+                .mobile-controls {
+                    display: grid;
+                }
+            }
             .controls-hint {
                 background: #22222b;
                 color: #fff;
@@ -68,7 +97,8 @@
                     <li><a href="publications.html">Publications</a></li>
                     <li><a href="personal.html">Personal Interests</a></li>
                     <li><a href="cv.html">CV</a></li>
-                    <li class="active"><a href="game.html">Collapsed Game</a></li>
+                    <li><a href="game.html">Orbit Game</a></li>
+                    <li class="active"><a href="platformer.html">Collapsed</a></li>
                     <li><a href="contact.html">Contact</a></li>
                 </ul>
                 <ul class="icons">
@@ -82,7 +112,7 @@
                 <section class="post">
                     <header class="major">
                         <h1>Collapsed</h1>
-                        <p>Navigate to the gate, toggle your shield with <strong>L</strong>, and unobserve with <strong>Q</strong> to warp probability clouds through solid barriers!</p>
+                        <p>Navigate procedural mazes, press <strong>S</strong> or Down to drop through platforms, toggle shields, and unobserve reality with <strong>Q</strong>!</p>
                     </header>
 
                     <!-- Game Box -->
@@ -94,16 +124,26 @@
                             <div id="hud-shield">Shield: Off</div>
                             <div>Status: <span id="hud-status">Find the Gate!</span></div>
                         </div>
+                        <!-- Mobile Touch Controls Layout -->
+                        <div class="mobile-controls">
+                            <button class="touch-btn" id="btn-left">◀</button>
+                            <button class="touch-btn" id="btn-right">▶</button>
+                            <button class="touch-btn" id="btn-jump">JUMP</button>
+                            <button class="touch-btn" id="btn-down">DOWN</button>
+                            <button class="touch-btn" id="btn-shield">SHIELD</button>
+                            <button class="touch-btn" id="btn-quantum" style="grid-column: span 3; background:#80deea;">Q: UN/OBSERVE</button>
+                        </div>
                     </div>
 
                     <div class="controls-hint">
-                        <h3>Controls:</h3>
+                        <h3>Controls (Keyboard & Mobile):</h3>
                         <ul>
-                            <li><strong>A / D</strong> or <strong>Left / Right Arrow</strong>: Move Left / Right</li>
-                            <li><strong>W</strong>, <strong>Space</strong>, or <strong>Up Arrow</strong>: Variable Jump (Hold for higher)</li>
-                            <li><strong>L Key</strong>: Toggle Energy Shield ON / OFF (1s active capacity, 2s cooldown)</li>
-                            <li><strong>Q Key</strong>: Toggle Unobserve / Observe (Warp cloud with W/A/S/D under constant area conservation, press Q again to collapse & rematerialize!)</li>
-                            <li><strong>R Key</strong>: Reset Level</li>
+                            <li><strong>Move:</strong> A / D or Left / Right Arrow (or mobile ◀ ▶ buttons)</li>
+                            <li><strong>Jump:</strong> W, Space, Up Arrow (or mobile JUMP button)</li>
+                            <li><strong>Drop Through Platform:</strong> S Key or Down Arrow (or mobile DOWN button)</li>
+                            <li><strong>Shield:</strong> L Key (or mobile SHIELD button) to toggle ON / OFF</li>
+                            <li><strong>Quantum Unobserve:</strong> Q Key (or mobile Q button) to enter cloud mode, adjust with W/A/S/D or touch buttons, press Q again to collapse!</li>
+                            <li><strong>Reset:</strong> R Key</li>
                         </ul>
                     </div>
                 </section>
@@ -148,7 +188,8 @@
             let levelCount = 1;
             let keys = {};
             let transitioning = false;
-            let transitionScale = 0;
+            let transitionProgress = 0; 
+            let transStartX = 0, transStartY = 0;
             let lives = 3;
             let invulnerableTimer = 0;
 
@@ -159,7 +200,7 @@
 
             // Quantum Wavefunction State
             let isQuantumMode = false;
-            let eyeAnimState = 0; // 0 = fully open, 1 = fully closed
+            let eyeAnimState = 0; 
             let eyeClosing = false;
             let rematerializing = false;
             let rematerializeTimer = 0;
@@ -190,7 +231,7 @@
             }
 
             // Variable Jump State
-            let jumpHoldLimit = 20;
+            let jumpHoldLimit = 22;
             let jumpHoldTimer = 0;
             let isJumping = false;
 
@@ -210,10 +251,11 @@
             let platforms = [];
             let quantumWalls = []; 
             let bushes = [];
-            let startPlatform = { x: 50, y: 480, w: 100, h: 20 };
+            let startPlatform = { x: 50, y: 520, w: 100, h: 20 };
             let gate = { x: 0, y: 0, size: 30, active: true };
+            let gatePlatform = null; 
 
-            // Input Listeners
+            // Keyboard Input Listeners
             window.addEventListener('keydown', e => { 
                 if (e.code === 'KeyQ') {
                     toggleQuantumMode();
@@ -233,6 +275,27 @@
                 }
             });
 
+            // Mobile Touch Button Bindings
+            function bindTouchButton(id, code) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('touchstart', e => { e.preventDefault(); keys[code] = true; });
+                el.addEventListener('touchend', e => { e.preventDefault(); keys[code] = false; });
+                el.addEventListener('mousedown', e => { e.preventDefault(); keys[code] = true; });
+                el.addEventListener('mouseup', e => { e.preventDefault(); keys[code] = false; });
+            }
+
+            bindTouchButton('btn-left', 'KeyA');
+            bindTouchButton('btn-right', 'KeyD');
+            bindTouchButton('btn-jump', 'Space');
+            bindTouchButton('btn-down', 'KeyS');
+
+            document.getElementById('btn-shield').addEventListener('click', () => toggleShield());
+            document.getElementById('btn-shield').addEventListener('touchstart', (e) => { e.preventDefault(); toggleShield(); });
+
+            document.getElementById('btn-quantum').addEventListener('click', () => toggleQuantumMode());
+            document.getElementById('btn-quantum').addEventListener('touchstart', (e) => { e.preventDefault(); toggleQuantumMode(); });
+
             function toggleShield() {
                 if (shieldCooldown > 0) return;
                 shieldActive = !shieldActive;
@@ -240,7 +303,6 @@
 
             function toggleQuantumMode() {
                 if (!isQuantumMode && !eyeClosing && !rematerializing) {
-                    // Enter Quantum Mode
                     isQuantumMode = true;
                     eyeClosing = true;
                     eyeAnimState = 0;
@@ -250,7 +312,6 @@
                     quantumCloud.radiusY = 60;
                     document.getElementById('hud-status').innerText = "Unobserved Mode Active";
                 } else if (isQuantumMode && eyeClosing) {
-                    // Exit Quantum Mode (Collapse)
                     collapseWavefunction();
                 }
             }
@@ -267,7 +328,6 @@
                 collapseTarget.x = sampleX;
                 collapseTarget.y = sampleY;
 
-                // Spawn dense converging particles across the probability cloud ellipse area
                 particles = [];
                 let particleCount = 45;
                 for (let i = 0; i < particleCount; i++) {
@@ -278,7 +338,7 @@
 
                     let dx = collapseTarget.x - startX;
                     let dy = collapseTarget.y - startY;
-                    let totalFrames = 22; // Convergence duration
+                    let totalFrames = 22;
 
                     particles.push({
                         x: startX,
@@ -292,7 +352,7 @@
                 rematerializing = true;
                 rematerializeTimer = 22;
                 isQuantumMode = false;
-                eyeClosing = false; // Start eye opening transition
+                eyeClosing = false;
 
                 player.x = sampleX;
                 player.y = sampleY;
@@ -303,33 +363,12 @@
                 document.getElementById('hud-status').innerText = "Wavefunction Collapsed!";
             }
 
-            function getPlayerJumpCapabilities() {
-                let simY = 0;
-                let simVy = player.jumpForce;
-                let maxY = 0;
-                let airTime = 0;
-                let holdFrames = jumpHoldLimit;
-
-                for (let frame = 0; frame < 120; frame++) {
-                    if (holdFrames > 0) {
-                        simVy += player.jumpForce * 0.08;
-                        holdFrames--;
-                    }
-                    simVy += player.gravity;
-                    simY += simVy;
-                    if (simY < maxY) maxY = simY;
-                    airTime++;
-                    if (simY >= 0) break;
-                }
-                return { maxJumpHeight: Math.abs(maxY), maxHorizontalReach: player.speed * airTime * 0.8 };
-            }
-
             function initLevel() {
                 platforms = [];
                 quantumWalls = [];
                 bushes = [];
                 transitioning = false;
-                transitionScale = 0;
+                transitionProgress = 0;
                 isQuantumMode = false;
                 eyeClosing = false;
                 eyeAnimState = 0;
@@ -340,64 +379,45 @@
                 platforms.push({ x: CANVAS_WIDTH - WALL_THICKNESS, y: 0, w: WALL_THICKNESS, h: CANVAS_HEIGHT });
                 platforms.push({ x: 0, y: CANVAS_HEIGHT - WALL_THICKNESS, w: CANVAS_WIDTH, h: WALL_THICKNESS });
 
-                let caps = getPlayerJumpCapabilities();
-
-                let startYOptions = [150, 300, 480];
-                let chosenStartY = startYOptions[Math.floor(Math.random() * startYOptions.length)];
-                startPlatform = { x: 50, y: chosenStartY, w: 100, h: 20 };
+                let startOnLeft = Math.random() > 0.5;
+                let startX = startOnLeft ? 50 : CANVAS_WIDTH - 150;
+                let startY = 520;
+                startPlatform = { x: startX, y: startY, w: 90, h: 20 };
                 platforms.push(startPlatform);
-
                 resetPlayerToStart();
 
-                let endYOptions = [150, 300, 480];
-                let chosenEndY = endYOptions[Math.floor(Math.random() * endYOptions.length)];
-                let targetX = 660;
-                let endPlatform = { x: targetX, y: chosenEndY, w: 100, h: 20 };
+                let midX = Math.floor(Math.random() * 120) + 340; 
+                let wallHeight1 = Math.floor(Math.random() * 80) + 280;
+                let wallY1 = Math.floor(Math.random() * 80) + 100;
+                quantumWalls.push({ x: midX, y: wallY1, w: 20, h: wallHeight1 });
 
-                let midX = CANVAS_WIDTH / 2 - 10;
-                quantumWalls.push({
-                    x: midX,
-                    y: 100,
-                    w: 20,
-                    h: 400 
-                });
+                let secWallX = startOnLeft ? Math.floor(Math.random() * 150) + 480 : Math.floor(Math.random() * 150) + 180;
+                let secWallY = Math.floor(Math.random() * 200) + 150;
+                quantumWalls.push({ x: secWallX, y: secWallY, w: 18, h: 220 });
 
-                let currentX = startPlatform.x + startPlatform.w + 20;
-                let currentY = startPlatform.y;
+                let platformCount = Math.floor(Math.random() * 3) + 5; 
+                for (let i = 0; i < platformCount; i++) {
+                    let pX = Math.random() * (CANVAS_WIDTH - 200) + 80;
+                    let pY = Math.random() * 380 + 100;
+                    let pW = Math.random() * 40 + 70; 
+                    
+                    let distFromStart = Math.hypot((pX + pW/2) - (startPlatform.x + startPlatform.w/2), pY - startPlatform.y);
+                    if (distFromStart > 120) {
+                        platforms.push({ x: pX, y: pY, w: pW, h: 18 });
 
-                while (currentX < midX - 20) {
-                    let pWidth = 80;
-                    let dx = 70;
-                    let dy = -40;
-
-                    currentX += dx;
-                    currentY = Math.max(120, currentY + dy);
-
-                    platforms.push({ x: currentX, y: currentY, w: pWidth, h: 18 });
-                    if (Math.random() > 0.5) {
-                        bushes.push({ x: currentX + pWidth/2, y: currentY - 13, r: 13 });
+                        if (Math.random() > 0.4) {
+                            bushes.push({ x: pX + pW / 2, y: pY - 13, r: 13 });
+                        }
                     }
                 }
 
-                currentX = midX + 40;
-                currentY = 150; 
-                while (currentX < targetX) {
-                    let pWidth = 80;
-                    let dx = 70;
-                    let dy = 40;
+                let gateX = startOnLeft ? CANVAS_WIDTH - 130 : 70;
+                let gateY = 80; 
+                gatePlatform = { x: gateX - 25, y: gateY + 30, w: 90, h: 20, isolated: true };
+                platforms.push(gatePlatform);
 
-                    currentX += dx;
-                    currentY = Math.min(500, currentY + dy);
-
-                    platforms.push({ x: currentX, y: currentY, w: pWidth, h: 18 });
-                    if (Math.random() > 0.5) {
-                        bushes.push({ x: currentX + pWidth/2, y: currentY - 13, r: 13 });
-                    }
-                }
-
-                platforms.push(endPlatform);
-                gate.x = endPlatform.x + endPlatform.w / 2 - gate.size / 2;
-                gate.y = endPlatform.y - gate.size;
+                gate.x = gatePlatform.x + gatePlatform.w / 2 - gate.size / 2;
+                gate.y = gatePlatform.y - gate.size;
                 gate.active = true;
 
                 updateHUD();
@@ -452,7 +472,6 @@
                     if (s.y < 0 || s.y > CANVAS_HEIGHT) s.vy *= -1;
                 }
 
-                // Eye Aperture Transition Progress
                 if (eyeClosing && eyeAnimState < 1.0) {
                     eyeAnimState += 0.08;
                     if (eyeAnimState > 1.0) eyeAnimState = 1.0;
@@ -462,15 +481,14 @@
                 }
 
                 if (transitioning) {
-                    transitionScale += 0.05;
-                    if (transitionScale >= 1.2) {
+                    transitionProgress += 0.03;
+                    if (transitionProgress >= 1.0) {
                         levelCount++;
                         initLevel();
                     }
                     return;
                 }
 
-                // Rematerialization Particle Convergence Update
                 if (rematerializing) {
                     rematerializeTimer--;
                     for (let p of particles) {
@@ -500,7 +518,7 @@
                     }
 
                     updateHUD();
-                    return; // Time & Physics Frozen
+                    return; 
                 }
 
                 if (invulnerableTimer > 0) invulnerableTimer--;
@@ -528,19 +546,18 @@
                     player.vx *= 0.8;
                 }
 
-                // Variable Jump Logic
-let jumpPressed = (keys['KeyW'] || keys['Space'] || keys['ArrowUp']);
-if (jumpPressed && player.grounded && !isJumping) {
-    player.vy = player.jumpForce;
-    player.grounded = false;
-    isJumping = true;
-    jumpHoldTimer = 22; // Frames you can hold to float higher
-} else if (jumpPressed && isJumping && jumpHoldTimer > 0) {
-    player.vy += player.jumpForce * 0.08;
-    jumpHoldTimer--;
-} else {
-    isJumping = false;
-}
+                let jumpPressed = (keys['KeyW'] || keys['Space'] || keys['ArrowUp']);
+                if (jumpPressed && player.grounded && !isJumping) {
+                    player.vy = player.jumpForce;
+                    player.grounded = false;
+                    isJumping = true;
+                    jumpHoldTimer = jumpHoldLimit; 
+                } else if (jumpPressed && isJumping && jumpHoldTimer > 0) {
+                    player.vy += player.jumpForce * 0.08;
+                    jumpHoldTimer--;
+                } else {
+                    isJumping = false;
+                }
 
                 player.vy += player.gravity;
 
@@ -576,8 +593,10 @@ if (jumpPressed && player.grounded && !isJumping) {
                     player.vy = 0;
                 }
 
+                let dropThrough = (keys['KeyS'] || keys['ArrowDown']);
+
                 for (let p of platforms) {
-                    if (
+                    if (!dropThrough &&
                         player.x + player.radius > p.x &&
                         player.x - player.radius < p.x + p.w &&
                         prevY + player.radius <= p.y &&
@@ -653,6 +672,9 @@ if (jumpPressed && player.grounded && !isJumping) {
                 ) {
                     gate.active = false;
                     transitioning = true;
+                    transitionProgress = 0;
+                    transStartX = gate.x + gate.size / 2;
+                    transStartY = gate.y + gate.size / 2;
                     document.getElementById('hud-status').innerText = "Gate Reached!";
                 }
 
@@ -704,7 +726,6 @@ if (jumpPressed && player.grounded && !isJumping) {
                     ctx.fillRect(gate.x + 5, gate.y + 5, gate.size - 10, gate.size - 10);
                 }
 
-                // Rematerialization Converging Particles (Color transitioning from cyan to player orange)
                 if (rematerializing) {
                     let progress = 1.0 - (rematerializeTimer / 22);
                     let r = Math.floor(128 + (255 - 128) * progress);
@@ -803,12 +824,16 @@ if (jumpPressed && player.grounded && !isJumping) {
                 }
 
                 if (transitioning) {
-                    let expandRadius = transitionScale * Math.max(CANVAS_WIDTH, CANVAS_HEIGHT) * 1.2;
-                    let centerX = gate.x + gate.size / 2;
-                    let centerY = gate.y + gate.size / 2;
+                    let targetX = gate.x + gate.size / 2;
+                    let targetY = gate.y + gate.size / 2;
+                    
+                    let curX = transStartX + (targetX - transStartX) * transitionProgress;
+                    let curY = transStartY + (targetY - transStartY) * transitionProgress;
+                    let maxRad = Math.max(CANVAS_WIDTH, CANVAS_HEIGHT) * 1.2;
+                    let curRad = maxRad * (1.0 - transitionProgress);
 
                     ctx.beginPath();
-                    ctx.arc(centerX, centerY, expandRadius, 0, Math.PI * 2);
+                    ctx.arc(curX, curY, Math.max(0, curRad), 0, Math.PI * 2);
                     ctx.fillStyle = '#ab47bc';
                     ctx.fill();
                 }
